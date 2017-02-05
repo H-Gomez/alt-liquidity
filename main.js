@@ -3,7 +3,21 @@
 var api = require('./api.js');
 var orders = require('./orderHandler.js');
 
-api.orderBook( function(data) {
-    orders.sumOrders(data);
-    console.log(data);
-});
+var snapshot = {};
+snapshot.symbol = "BTC_NXC";
+
+setInterval(function () {
+    api.orderBook(function(data) {
+        orders.sumOrders(data);
+        snapshot.bidSum = data.bidSum;
+        snapshot.askSum = data.askSum;
+    });
+
+    api.ticker(function(data) {
+        snapshot.price = data['BTC_NXC']['last'];
+    });
+
+    console.log(snapshot);
+}, 2000);
+
+
