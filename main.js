@@ -4,7 +4,7 @@ var api = require('./api.js');
 var orders = require('./orderHandler.js');
 
 var snapshot = {};
-snapshot.symbol = "BTC_NXC";
+snapshot.symbol = "BTC_ETH";
 
 setInterval(function () {
     api.orderBook(function(data) {
@@ -14,11 +14,12 @@ setInterval(function () {
     });
 
     api.ticker(function(data) {
-        snapshot.price = data['BTC_NXC']['last'];
+        snapshot.price = data['BTC_ETH']['last'];
     });
+}, 50000);
 
+setInterval(function () {
     api.update(snapshot);
-    console.log(snapshot);
-}, 2000);
+}, 120000);
 
 

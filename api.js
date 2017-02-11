@@ -1,10 +1,11 @@
 const request = require('request');
 const azure = require('azure-storage');
+const uuid = require('uuid');
 
-const depth = 50000;
-const market = "BTC_NXC";
+const depth = 100000;
+const market = "BTC_ETH";
 const restUri = "https://poloniex.com/public?command=";
-const tickerUrl = restUri + "returnTicker&currencyPair=BTC_NXC";
+const tickerUrl = restUri + "returnTicker&currencyPair=" + market;
 const marketUrl = restUri + "returnOrderBook&currencyPair=" + market + "&depth=" + depth;
 
 /**
@@ -40,33 +41,53 @@ function pushMarketSnapshot(marketData, callback) {
 
     tableService.createTableIfNotExists('depth', function(error, result, response) {
         if (!error){
-            console.log(result, response);
+            //console.log(result, response);
         }
         else {
-            console.log(error);
+            //console.log(error);
         }
     });
 
     var snapshot = {
         PartitionKey: entGen.String('markets'),
-        RowKey: entGen.String('1'),
+        RowKey: entGen.String(uuid()),
         symbol: entGen.String(marketData.symbol),
         price: entGen.Double(marketData.price),
         bidSum: entGen.Double(marketData.bidSum),
         askSum: entGen.Double(marketData.askSum)
-    }
+    };
 
     tableService.insertEntity('depth', snapshot, function(error, result, response) {
        if (!error) {
-           console.log(result, response);
+           console.log("Row added");
        }
+    });
+}
+
+function getMarketDepth(callback) {
+    var account = 'altester';
+    var key = 'Tywcply3HpxJmqFXmYCDy5r+qGHspaCi3dk7AoAnhINyyx8ohAJ2T8Dv1ps3ty9fiDUUV9JmN/v4xdweZhVyFQ==';
+
+    var tableService = azure.createTableService(account, key);
+
+
+    var query = new azure.TableQuery()
+        .select(['price, bidSum, askSum, Timestamp'])
+        .top(10)
+        .where('PartitionKey eq ?', 'markets');
+
+    tableService.queryEntities('depth', query, null, function(error, result, response) {
+        if (!error) {
+            callback((response.body.value));
+        }
     });
 }
 
 module.exports = {
     orderBook: getOrderBook,
     ticker: getTicker,
-    update: pushMarketSnapshot
+    update: pushMarketSnapshot,
+    getDepth: getMarketDepth
 };
 
 
