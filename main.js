@@ -17,6 +17,7 @@ setInterval(function () {
         snapshot.price = data['BTC_NXC']['last'];
     });
 
+    api.update(snapshot);
     console.log(snapshot);
 }, 2000);
 

@@ -5,6 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "autobahn": "^0.11.2",
+    "azure-storage": "^2.0.0",
     "request": "^2.79.0",
     "ws": "^1.1.1"
   },
