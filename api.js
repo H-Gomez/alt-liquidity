@@ -94,6 +94,8 @@ function pushMarketSnapshot(marketSnapshot, callback) {
             }
         });
     });
+
+    callback();
 }
 
 /**

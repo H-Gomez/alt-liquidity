@@ -19,12 +19,11 @@ setInterval(function () {
             marketSnapshot.askSum = data.askSum;
             marketSnapshot.price = ticker[data.symbol]['last'];
             snapshot.push(marketSnapshot);
+
+            api.update(snapshot, function() {
+                snapshot = [];
+            });
         });
     });
-}, 30000);
-
-setInterval(function () {
-    api.update(snapshot);
-}, 60000);
-
+}, 300000);
 
