@@ -3,20 +3,33 @@ const azure = require('azure-storage');
 const uuid = require('uuid');
 
 const depth = 100000;
-const market = "BTC_ETH";
+const markets = ['BTC_ETH', 'BTC_ETC', 'BTC_MAID', 'BTC_STRAT', 'BTC_XMR', 'BTC_NXC'];
 const restUri = "https://poloniex.com/public?command=";
-const tickerUrl = restUri + "returnTicker&currencyPair=" + market;
-const marketUrl = restUri + "returnOrderBook&currencyPair=" + market + "&depth=" + depth;
+const tickerUrl = restUri + "returnTicker";
+const marketUrl = restUri + "returnOrderBook&currencyPair=";
+
+const account = 'altester';
+const key = 'Tywcply3HpxJmqFXmYCDy5r+qGHspaCi3dk7AoAnhINyyx8ohAJ2T8Dv1ps3ty9fiDUUV9JmN/v4xdweZhVyFQ==';
+const tableService = azure.createTableService(account, key);
 
 /**
  * Get the order for a given symbol from the api endpoint;
  * @param callback function
  */
 function getOrderBook(callback) {
-    request(marketUrl, function(error, response, body) {
-       if (!error && response.statusCode == 200) {
-           callback(JSON.parse(body));
-       }
+    markets.forEach(function(market) {
+        var requestUrl = marketUrl + market + "&depth=" + depth;
+
+        request(requestUrl, function(error, response, body) {
+            if (!error && response.statusCode == 200) {
+                var orderBook = {};
+                orderBook.orders = JSON.parse(body);
+                orderBook.symbol = market;
+                callback(orderBook);
+            } else {
+                console.log(error);
+            }
+        });
     });
 }
 
@@ -27,50 +40,67 @@ function getTicker(callback) {
     request(tickerUrl, function (error, response, body) {
         if (!error && response.statusCode == 200) {
             callback(JSON.parse(body));
+        } else {
+            console.log(error);
         }
     });
 }
 
-function pushMarketSnapshot(marketData, callback) {
+/**
+ * Checks the data store for existing tables and creates a new one per market
+ * if required.
+ */
+function prepareTables() {
+    markets.forEach(function(market) {
+        var tableName = market.replace(/_/g, "");
+        tableService.createTableIfNotExists(tableName, function(error, result, response) {
+            if (error) {
+                console.log(error);
+            } else if (response.statusCode == 204) {
+                console.log("Created new table: " + tableName);
+            } else if (response.statusCode == 200) {
+                console.log("Table already exists: " + tableName);
+            }
+            else {
+                console.log(response);
+            }
+        });
+    });
+}
+
+/**
+ * Pushes the market data, in a snapshot form to Azure.
+ * @param marketSnapshot
+ * @param callback
+ */
+function pushMarketSnapshot(marketSnapshot, callback) {
     var entGen = azure.TableUtilities.entityGenerator;
 
-    var account = 'altester';
-    var key = 'Tywcply3HpxJmqFXmYCDy5r+qGHspaCi3dk7AoAnhINyyx8ohAJ2T8Dv1ps3ty9fiDUUV9JmN/v4xdweZhVyFQ==';
+    marketSnapshot.forEach(function(market) {
+        var tableName = market.symbol.replace(/_/g, "");
+        var snapshot = {
+            PartitionKey: entGen.String(market.symbol),
+            RowKey: entGen.String(uuid()),
+            price: entGen.Double(market.price),
+            bidSum: entGen.Double(market.bidSum),
+            askSum: entGen.Double(market.askSum)
+        };
 
-    var tableService = azure.createTableService(account, key);
-
-    tableService.createTableIfNotExists('depth', function(error, result, response) {
-        if (!error){
-            //console.log(result, response);
-        }
-        else {
-            //console.log(error);
-        }
-    });
-
-    var snapshot = {
-        PartitionKey: entGen.String('markets'),
-        RowKey: entGen.String(uuid()),
-        symbol: entGen.String(marketData.symbol),
-        price: entGen.Double(marketData.price),
-        bidSum: entGen.Double(marketData.bidSum),
-        askSum: entGen.Double(marketData.askSum)
-    };
-
-    tableService.insertEntity('depth', snapshot, function(error, result, response) {
-       if (!error) {
-           console.log("Row added");
-       }
+        tableService.insertEntity(tableName, snapshot, function(error, result, response) {
+            if (!error) {
+                console.log("Market snapshot added successfully");
+            } else {
+                console.log(error);
+            }
+        });
     });
 }
 
+/**
+ * Builds a query used to get the data from Azure
+ * @param callback
+ */
 function getMarketDepth(callback) {
-    var account = 'altester';
-    var key = 'Tywcply3HpxJmqFXmYCDy5r+qGHspaCi3dk7AoAnhINyyx8ohAJ2T8Dv1ps3ty9fiDUUV9JmN/v4xdweZhVyFQ==';
-
-    var tableService = azure.createTableService(account, key);
-
-
     var query = new azure.TableQuery()
         .select(['price, bidSum, askSum, Timestamp'])
         .top(10)
@@ -87,7 +117,8 @@ module.exports = {
     orderBook: getOrderBook,
     ticker: getTicker,
     update: pushMarketSnapshot,
-    getDepth: getMarketDepth
+    getDepth: getMarketDepth,
+    init: prepareTables
 };
 
 

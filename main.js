@@ -2,24 +2,29 @@
 
 var api = require('./api.js');
 var orders = require('./orderHandler.js');
+var snapshot = [];
+var ticker;
 
-var snapshot = {};
-snapshot.symbol = "BTC_ETH";
+api.init();
 
 setInterval(function () {
-    api.orderBook(function(data) {
-        orders.sumOrders(data);
-        snapshot.bidSum = data.bidSum;
-        snapshot.askSum = data.askSum;
-    });
-
     api.ticker(function(data) {
-        snapshot.price = data['BTC_ETH']['last'];
+        ticker = data;
+
+        api.orderBook(function(data) {
+            orders.sumOrders(data);
+            var marketSnapshot = {};
+            marketSnapshot.symbol = data.symbol;
+            marketSnapshot.bidSum = data.bidSum;
+            marketSnapshot.askSum = data.askSum;
+            marketSnapshot.price = ticker[data.symbol]['last'];
+            snapshot.push(marketSnapshot);
+        });
     });
-}, 50000);
+}, 30000);
 
 setInterval(function () {
     api.update(snapshot);
-}, 120000);
+}, 60000);
 
 
